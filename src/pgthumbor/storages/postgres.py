@@ -1,3 +1,4 @@
+import base64
 import os
 
 import sqlalchemy as db
@@ -15,7 +16,7 @@ class Image(Base):
     __tablename__ = 'images'
     id = db.Column(db.Integer, primary_key=True)
     path = db.Column(db.String(), unique=True, nullable=False)
-    data = db.Column(db.Text(), nullable=False)
+    data = db.Column(db.UnicodeText(), nullable=False)
     detector = db.Column(db.Text(), nullable=True)
     crypto = db.Column(db.Text(), nullable=True)
 
@@ -38,14 +39,14 @@ class Storage(storages.BaseStorage):
         if not image:
             callback(None)
             return
-        callback(image.data)
+        callback(base64.b64decode(image.data))
 
     def put(self, path, bytes):
         image = self.get_image(path)
         if not image:
             image = Image()
         image.path = path
-        image.data = bytes
+        image.data = base64.b64encode(bytes)
         self.save_db(image)
         return path
 

@@ -9,7 +9,7 @@ def read(fname):
 
 setup(
     name='pgthumbor',
-    version='0.0.3',
+    version='0.0.7',
     url='https://github.com/Maethorin/pgthumbor',
     license='MIT',
     description='Postgres Storage for Thumbor',
