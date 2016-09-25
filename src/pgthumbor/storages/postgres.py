@@ -1,37 +1,20 @@
-import base64
-import os
+# -*- coding: utf-8 -*-
 
-import sqlalchemy as db
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from thumbor import storages
 from tornado.concurrent import return_future
 
-Base = declarative_base()
-engine = db.create_engine(os.environ['DATABASE_URL'])
-Session = sessionmaker(bind=engine)
-
-
-class Image(Base):
-    __tablename__ = 'images'
-    id = db.Column(db.Integer, primary_key=True)
-    path = db.Column(db.String(), unique=True, nullable=False)
-    data = db.Column(db.UnicodeText(), nullable=False)
-    detector = db.Column(db.Text(), nullable=True)
-    crypto = db.Column(db.Text(), nullable=True)
+from pgthumbor import models
 
 
 class Storage(storages.BaseStorage):
-    def __init__(self, context):
-        super(Storage, self).__init__(context)
-        self.session = Session()
 
-    def get_image(self, path):
-        return self.session.query(Image).filter(Image.path == path).first()
+    @staticmethod
+    def get_image(path):
+        return models.Image.get(path)
 
-    def save_db(self, image):
-        self.session.add(image)
-        self.session.commit()
+    @staticmethod
+    def save_db(image):
+        image.save()
 
     @return_future
     def get(self, path, callback):
@@ -39,22 +22,19 @@ class Storage(storages.BaseStorage):
         if not image:
             callback(None)
             return
-        callback(base64.b64decode(image.data))
+        callback(image.decoded_data)
 
-    def put(self, path, bytes):
+    def put(self, path, data):
         image = self.get_image(path)
         if not image:
-            image = Image()
-        image.path = path
-        image.data = base64.b64encode(bytes)
-        self.save_db(image)
+            image = models.Image()
+        image.set_values(path, data)
         return path
 
     def remove(self, path):
         image = self.get_image(path)
         if image:
-            self.session.delete(image)
-            self.session.commit()
+            image.delete()
 
     @return_future
     def exists(self, path, callback):
@@ -76,8 +56,7 @@ class Storage(storages.BaseStorage):
             raise RuntimeError("STORES_CRYPTO_KEY_FOR_EACH_IMAGE can't be True if no SECURITY_KEY specified")
         image = self.get_image(path)
         if image:
-            image.crypto = self.context.server.security_key
-            self.save_db(image)
+            image.set_crypto(self.context.server.security_key)
         return path
 
     @return_future
@@ -91,6 +70,5 @@ class Storage(storages.BaseStorage):
     def put_detector_data(self, path, data):
         image = self.get_image(path)
         if image:
-            image.detector = data
-            self.save_db(image)
+            image.set_detector(data)
         return path
